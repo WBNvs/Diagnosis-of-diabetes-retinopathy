@@ -11,7 +11,9 @@
       action="#"
       :auto-upload="false"
       :on-change="handleFileChange"
-      accept="image/*"
+      :before-upload="beforeUpload"
+      accept="image/jpeg,image/jpg"
+      :show-file-list="false"
     >
       <el-icon class="el-icon--upload"><upload-filled /></el-icon>
       <div class="el-upload__text">
@@ -19,7 +21,7 @@
       </div>
       <template #tip>
         <div class="el-upload__tip">
-          支持 jpg/png 格式的眼底图像
+          支持 jpg 格式的眼底图像，文件大小不超过 10MB
         </div>
       </template>
     </el-upload>
@@ -29,13 +31,47 @@
 <script setup>
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { uploadImageForDiagnosis } from '@/api/diagnosis'
 
-const emit = defineEmits(['upload-success'])
+const emit = defineEmits(['upload-success', 'upload-error'])
 
-const handleFileChange = (file) => {
-  if (file) {
-    ElMessage.success('文件上传成功')
-    emit('upload-success', file.raw)
+// 上传前验证
+const beforeUpload = (file) => {
+  const isJPG = file.type === 'image/jpeg' || file.type === 'image/jpg'
+  const isLt10M = file.size / 1024 / 1024 < 10
+
+  if (!isJPG) {
+    ElMessage.error('只能上传 JPG 格式的图片！')
+    return false
+  }
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过 10MB！')
+    return false
+  }
+  return true
+}
+
+// 处理文件选择
+const handleFileChange = async (file) => {
+  if (!file) return
+  
+  try {
+    // 显示上传中提示
+    ElMessage.info('正在上传图片...')
+    
+    // 调用API上传图片
+    const result = await uploadImageForDiagnosis(file.raw)
+    
+    // 上传成功
+    ElMessage.success('图片上传成功')
+    emit('upload-success', {
+      file: file.raw,
+      result: result
+    })
+  } catch (error) {
+    // 上传失败
+    ElMessage.error('图片上传失败：' + (error.message || '未知错误'))
+    emit('upload-error', error)
   }
 }
 </script>

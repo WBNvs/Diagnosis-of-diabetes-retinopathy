@@ -1,0 +1,55 @@
+前后端对接说明文档（诊断图片接口）
+
+【目标】
+实现一个后端接口，供前端发送用户上传的 JPG 图片进行诊断分析，并获取处理结果，用于展示病灶分布与文字信息。
+
+【1. 接口说明】
+- 接口路径：POST /api/diagnosis/analyze
+- 请求格式：multipart/form-data
+- 请求字段：
+  - image：用户上传的 JPG 图像文件
+
+【2. 请求示例】
+字段名：image
+类型：文件
+说明：用户上传的 retina.jpg 文件
+
+前端发送方式示例（使用 Axios）：
+  const formData = new FormData();
+  formData.append("image", file);
+  axios.post("http://localhost:5000/api/diagnosis/analyze", formData)
+
+【3. 响应格式（JSON）】
+{
+  "lesionCount": 3,
+  "diagnosis": "轻度病变",
+  "confidence": 95,
+  "lesionBoxes": [
+    { "x": 20, "y": 30, "width": 10, "height": 10 },
+    { "x": 50, "y": 40, "width": 8,  "height": 8  },
+    { "x": 70, "y": 60, "width": 12, "height": 12 }
+  ],
+  "lesionDetails": [
+    { "id": 1, "type": "微动脉瘤", "confidence": 98, "description": "位于视网膜上方" },
+    { "id": 2, "type": "出血点",   "confidence": 95, "description": "位于视网膜下方" },
+    { "id": 3, "type": "硬性渗出", "confidence": 92, "description": "位于视网膜中央" }
+  ]
+}
+
+【4. 错误处理（建议）】
+出错时返回如下结构，并配合 HTTP 状态码（如 400 或 500）：
+{
+  "error": "图片格式不支持"
+}
+
+【5. 后端开发注意事项】
+- 图像保存：后端可将接收到的图片临时保存至本地目录处理
+- 模型调用：将图片输入模型，提取病灶位置与类型信息
+- 返回数据：返回字段需与前端约定一致，字段名不要随意更改
+- 跨域支持：开发阶段建议允许来自 localhost:5173 的跨域请求
+- 监听端口：默认端口为 5000（如有更改请同步告知前端）
+
+【对接建议流程】
+1. 前端已实现上传并发送逻辑，预设请求为 /api/diagnosis/analyze
+2. 后端完成该接口开发后，无需改动前端，仅需保证接口地址与返回字段匹配
+3. 初期可先用假数据测试接口联通

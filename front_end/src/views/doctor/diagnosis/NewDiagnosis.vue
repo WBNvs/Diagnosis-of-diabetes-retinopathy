@@ -15,7 +15,8 @@
           :auto-upload="false"
           :show-file-list="false"
           :on-change="handleFileChange"
-          accept="image/*"
+          :before-upload="beforeUpload"
+          accept="image/jpeg,image/jpg"
         >
           <el-icon class="el-icon--upload"><Upload /></el-icon>
           <div class="el-upload__text">
@@ -23,7 +24,7 @@
           </div>
           <template #tip>
             <div class="el-upload__tip">
-              支持 jpg、png 格式的眼底图片
+              支持 jpg 格式的眼底图片，文件大小不超过 10MB
             </div>
           </template>
         </el-upload>
@@ -104,6 +105,7 @@
 import { ref } from 'vue'
 import { Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { uploadImageForDiagnosis } from '@/api/diagnosis'
 
 // 当前图片
 const currentImage = ref(null)
@@ -120,26 +122,51 @@ const lesionBoxes = ref([])
 // 病灶详情
 const lesionDetails = ref([])
 
+// 上传前验证
+const beforeUpload = (file) => {
+  const isJPG = file.type === 'image/jpeg' || file.type === 'image/jpg'
+  const isLt10M = file.size / 1024 / 1024 < 10
+
+  if (!isJPG) {
+    ElMessage.error('只能上传 JPG 格式的图片！')
+    return false
+  }
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过 10MB！')
+    return false
+  }
+  return true
+}
+
 // 处理文件选择
-const handleFileChange = (file) => {
+const handleFileChange = async (file) => {
   if (!file) return
   
-  // 检查文件类型
-  const isImage = file.raw.type.startsWith('image/')
-  if (!isImage) {
-    ElMessage.error('请上传图片文件')
-    return
+  try {
+    // 显示上传中提示
+    ElMessage.info('正在上传图片...')
+    
+    // 调用API上传图片
+    const result = await uploadImageForDiagnosis(file.raw)
+    
+    // 更新当前图片
+    currentImage.value = {
+      file: file.raw,
+      url: URL.createObjectURL(file.raw)
+    }
+    
+    // 更新诊断结果
+    lesionCount.value = result.lesionCount
+    aiDiagnosis.value = result.diagnosis
+    confidence.value = result.confidence
+    lesionBoxes.value = result.lesionBoxes
+    lesionDetails.value = result.lesionDetails
+    
+    ElMessage.success('诊断完成')
+  } catch (error) {
+    ElMessage.error('诊断失败：' + (error.message || '未知错误'))
+    resetDiagnosis()
   }
-
-  // 创建预览URL
-  const url = URL.createObjectURL(file.raw)
-  currentImage.value = {
-    file: file.raw,
-    url
-  }
-
-  // 重置诊断结果
-  resetDiagnosis()
 }
 
 // 开始诊断
