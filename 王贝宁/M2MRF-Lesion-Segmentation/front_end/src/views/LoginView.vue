@@ -37,6 +37,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { login } from '@/api/diagnosis'  // 替换成你项目中实际路径
 
 const router = useRouter()
 const loginFormRef = ref(null)
@@ -53,37 +54,32 @@ const rules = {
   role: [{ required: true, message: '请选择角色', trigger: 'change' }]
 }
 
-const handleLogin = () => {
-  loginFormRef.value.validate((valid) => {
-    if (valid) {
-      // 模拟登录请求
-      const response = {
-        token: 'demo-token',
-        role: loginForm.role
-      }
-      
-      // 存储登录信息
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('role', response.role)
-      
-      console.log('登录信息已存储:', {
-        token: localStorage.getItem('token'),
-        role: localStorage.getItem('role')
-      })
-      
+const handleLogin = async () => {
+  loginFormRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    try {
+      // 1. 调用封装好的登录 API
+      const res = await login(loginForm.username, loginForm.password, loginForm.role)
+      const tokenData = res.token  // 后端返回的结构
+
+      // 2. 存储完整用户信息
+      localStorage.setItem('token', JSON.stringify(tokenData))
+
       ElMessage.success('登录成功')
-      // 修改跳转逻辑
-      if (response.role === 'doctor') {
-        console.log('准备跳转到医生仪表盘')
-        router.push('/dashboard/doctor').catch(err => {
-          console.error('路由跳转失败:', err)
-        })
+
+      // 3. 路由跳转（根据角色）
+      if (tokenData.role === 'doctor') {
+        router.push('/dashboard/doctor')
+      } else if (tokenData.role === 'patient') {
+        router.push('/dashboard/patient')
       } else {
-        console.log('准备跳转到患者仪表盘')
-        router.push('/dashboard/patient').catch(err => {
-          console.error('路由跳转失败:', err)
-        })
+        ElMessage.warning('未知角色，无法跳转')
       }
+
+    } catch (err) {
+      console.error('登录失败:', err)
+      ElMessage.error('用户名或密码错误')
     }
   })
 }

@@ -25,7 +25,6 @@
               <span>AI 诊断</span>
             </template>
             <el-menu-item index="diagnosis-new">上传图片诊断</el-menu-item>
-            <el-menu-item index="diagnosis-history">诊断历史</el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu index="reports">
@@ -59,8 +58,6 @@
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item>个人信息</el-dropdown-item>
-                    <el-dropdown-item>修改密码</el-dropdown-item>
                     <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>

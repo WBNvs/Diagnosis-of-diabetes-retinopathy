@@ -6,51 +6,29 @@
           <div class="header-left">
             <span class="title">待审核报告</span>
           </div>
-          <div class="header-right">
-            <el-input
-              v-model="searchQuery"
-              placeholder="搜索患者姓名/ID"
-              class="search-input"
-              clearable
-              @clear="handleSearch"
-              @keyup.enter="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><search /></el-icon>
-              </template>
-            </el-input>
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              @change="handleSearch"
-            />
-          </div>
         </div>
       </template>
 
       <el-table
-        :data="filteredReports"
+        :data="reportsList"
         style="width: 100%"
         v-loading="loading"
       >
-        <el-table-column prop="reportId" label="报告编号" width="120" />
-        <el-table-column prop="patientName" label="患者姓名" width="120" />
-        <el-table-column prop="patientId" label="患者ID" width="120" />
-        <el-table-column prop="checkDate" label="检查日期" width="120" />
-        <el-table-column prop="diagnosisTime" label="诊断时间" width="180" />
-        <el-table-column prop="lesionCount" label="病灶数量" width="100">
+        <el-table-column prop="diagnosis_id" label="报告编号" width="120" />
+        <el-table-column prop="patient_name" label="患者姓名" width="120" />
+        <el-table-column prop="diagnose_date" label="诊断时间" width="180" />
+        <el-table-column prop="lesion_count" label="病灶数量" width="100">
           <template #default="scope">
-            <el-tag :type="scope.row.lesionCount > 0 ? 'danger' : 'success'">
-              {{ scope.row.lesionCount }}
+            <el-tag :type="scope.row.lesion_count > 0 ? 'danger' : 'success'">
+              {{ scope.row.lesion_count }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="doctor" label="诊断医生" width="120" />
+        <el-table-column prop="confirmed" label="状态" width="100">
+          <template #default="scope">
+            <el-tag type="warning">待审核</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" fixed="right" width="200">
           <template #default="scope">
             <el-button type="primary" link @click="handleReview(scope.row)">审核</el-button>
@@ -59,18 +37,6 @@
           </template>
         </el-table-column>
       </el-table>
-
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
     </el-card>
 
     <!-- 退回原因对话框 -->
@@ -100,18 +66,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getDoctorDiagnosisHistory, confirmDiagnosis, deleteDiagnosis } from '@/api/diagnosis'
 
 const router = useRouter()
+const doctor_id = 1
+const reportsList = ref([])
 const loading = ref(false)
-const searchQuery = ref('')
-const dateRange = ref([])
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(100)
 const rejectDialogVisible = ref(false)
 const selectedReport = ref(null)
 
@@ -119,53 +82,16 @@ const rejectForm = ref({
   reason: ''
 })
 
-// 模拟数据
-const reportsList = ref([
-  {
-    reportId: 'R20240320001',
-    patientName: '张三',
-    patientId: 'P001',
-    checkDate: '2024-03-20',
-    diagnosisTime: '2024-03-20 14:30:00',
-    lesionCount: 2,
-    doctor: '李医生'
-  },
-  {
-    reportId: 'R20240320002',
-    patientName: '李四',
-    patientId: 'P002',
-    checkDate: '2024-03-20',
-    diagnosisTime: '2024-03-20 13:45:00',
-    lesionCount: 0,
-    doctor: '王医生'
-  },
-  {
-    reportId: 'R20240319001',
-    patientName: '王五',
-    patientId: 'P003',
-    checkDate: '2024-03-19',
-    diagnosisTime: '2024-03-19 11:20:00',
-    lesionCount: 3,
-    doctor: '张医生'
+const handleReview = async (row) => {
+  try {
+    await confirmDiagnosis(row.diagnosis_id)
+    ElMessage.success('审核成功')
+    // 刷新列表
+    await fetchPendingReports()
+  } catch (error) {
+    ElMessage.error('审核失败')
+    console.error('审核失败:', error)
   }
-])
-
-const filteredReports = computed(() => {
-  return reportsList.value.filter(item => {
-    const matchQuery = !searchQuery.value || 
-      item.patientName.includes(searchQuery.value) ||
-      item.patientId.includes(searchQuery.value)
-    
-    const matchDate = !dateRange.value.length || 
-      (item.checkDate >= dateRange.value[0] && 
-       item.checkDate <= dateRange.value[1])
-    
-    return matchQuery && matchDate
-  })
-})
-
-const handleReview = (row) => {
-  router.push(`/dashboard/doctor/reports/review/${row.reportId}`)
 }
 
 const handleReject = (row) => {
@@ -174,42 +100,56 @@ const handleReject = (row) => {
 }
 
 const handleView = (row) => {
-  router.push(`/dashboard/doctor/reports/${row.reportId}`)
+  router.push(`/dashboard/doctor/reports/${row.diagnosis_id}`)
 }
 
-const confirmReject = () => {
+const confirmReject = async () => {
   if (!rejectForm.value.reason) {
     ElMessage.warning('请输入退回原因')
     return
   }
   
-  // 模拟退回操作
-  const index = reportsList.value.findIndex(item => item.reportId === selectedReport.value.reportId)
-  if (index !== -1) {
-    reportsList.value.splice(index, 1)
+  try {
+    await ElMessageBox.confirm(
+      '确定要退回该报告吗？此操作不可恢复。',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await deleteDiagnosis(selectedReport.value.diagnosis_id)
     ElMessage.success('报告已退回')
+    // 刷新列表
+    await fetchPendingReports()
+    rejectDialogVisible.value = false
+    rejectForm.value.reason = ''
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('退回失败')
+      console.error('退回失败:', error)
+    }
   }
-  
-  rejectDialogVisible.value = false
-  rejectForm.value.reason = ''
 }
 
-const handleSearch = () => {
+const fetchPendingReports = async () => {
+  if (!doctor_id) return
   loading.value = true
-  setTimeout(() => {
+  try {
+    // 只获取待审核
+    reportsList.value = await getDoctorDiagnosisHistory(doctor_id, 'false')
+  } catch (e) {
+    console.error('获取待审核报告失败', e)
+  } finally {
     loading.value = false
-  }, 500)
+  }
 }
 
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  handleSearch()
-}
-
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  handleSearch()
-}
+onMounted(() => {
+  fetchPendingReports()
+})
 </script>
 
 <style scoped>
@@ -232,21 +172,6 @@ const handleCurrentChange = (val) => {
 .header-left .title {
   font-size: 18px;
   font-weight: bold;
-}
-
-.header-right {
-  display: flex;
-  gap: 16px;
-}
-
-.search-input {
-  width: 200px;
-}
-
-.pagination-container {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .dialog-footer {

@@ -56,7 +56,14 @@ const routes = [
     path: '/dashboard/patient',
     name: 'PatientDashboard',
     component: () => import('../views/patient/PatientDashboard.vue'),
-    meta: { requiresAuth: true, role: 'patient' }
+    meta: { requiresAuth: true, role: 'patient' },
+    children: [
+      {
+        path: 'reports/:id',
+        name: 'PatientReportDetail',
+        component: () => import('../views/patient/reports/PatientReportDetail.vue')
+      }
+    ]
   }
 ]
 
@@ -67,8 +74,18 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
-  const role = localStorage.getItem('role')
+  const tokenStr = localStorage.getItem('token')
+  let token = null
+  let role = null
+  
+  if (tokenStr) {
+    try {
+      token = JSON.parse(tokenStr)
+      role = token.role
+    } catch (e) {
+      console.error('解析token失败:', e)
+    }
+  }
   
   console.log('路由守卫检查:', {
     to: to.path,
@@ -87,8 +104,11 @@ router.beforeEach((to, from, next) => {
     // 如果用户角色与路由要求的角色不匹配，重定向到对应角色的仪表盘
     if (role === 'doctor') {
       next('/dashboard/doctor')
-    } else {
+    } else if (role === 'patient') {
       next('/dashboard/patient')
+    } else {
+      // 如果角色无效，重定向到登录页
+      next('/login')
     }
   } else {
     console.log('路由检查通过，允许访问')

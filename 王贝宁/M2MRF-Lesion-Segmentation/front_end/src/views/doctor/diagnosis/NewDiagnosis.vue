@@ -35,6 +35,19 @@
           fit="contain"
           style="margin-top: 20px; max-width: 100%; max-height: 400px;"
         />
+        <!-- 添加病人信息输入区域 -->
+        <div v-if="segmentedImgUrl" class="patient-info-section">
+          <el-form :model="patientForm" :rules="rules" ref="patientFormRef" label-width="100px">
+            <el-form-item label="病人姓名" prop="patientName">
+              <el-input v-model="patientForm.patientName" placeholder="请输入病人姓名"></el-input>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="handleSubmitDiagnosis" :loading="submitting">
+                提交诊断
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </div>
       </div>
 
       <div v-if="currentImage" class="diagnosis-section">
@@ -112,7 +125,13 @@
 import { ref } from 'vue'
 import { Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { uploadImageForSegmentation } from '@/api/diagnosis'
+import { uploadImageForSegmentation, submitDiagnosis as submitDiagnosisApi } from '@/api/diagnosis'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
+
+const router = useRouter()
+const patientFormRef = ref(null)
+const submitting = ref(false)
 
 // 当前图片
 const currentImage = ref(null)
@@ -128,6 +147,19 @@ const confidence = ref(0)
 const lesionBoxes = ref([])
 // 病灶详情
 const lesionDetails = ref([])
+
+// 病人信息表单
+const patientForm = ref({
+  patientName: ''
+})
+
+// 表单验证规则
+const rules = {
+  patientName: [
+    { required: true, message: '请输入病人姓名', trigger: 'blur' },
+    { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
+  ]
+}
 
 // 上传前验证
 const beforeUpload = (file) => {
@@ -218,6 +250,70 @@ const getDiagnosisType = (diagnosis) => {
       return 'info'
   }
 }
+
+// 提交诊断
+const handleSubmitDiagnosis = async () => {
+  if (!patientFormRef.value) return
+  
+  await patientFormRef.value.validate(async (valid) => {
+    if (!valid) {
+      ElMessage.warning('请填写完整的病人信息')
+      return
+    }
+
+    if (!segmentedImgUrl.value) {
+      ElMessage.warning('请先上传并分割图片')
+      return
+    }
+
+    submitting.value = true
+    try {
+      // 获取token中的医生ID
+      const tokenStr = localStorage.getItem('token')
+      if (!tokenStr) {
+        throw new Error('未登录')
+      }
+      const token = JSON.parse(tokenStr)
+      const doctor_id = token.doctor_id
+
+      // 将图片转换为base64
+      const response = await fetch(segmentedImgUrl.value)
+      const blob = await response.blob()
+      const reader = new FileReader()
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+      const imageData = await base64Promise
+
+      // 准备诊断数据
+      const diagnosisData = {
+        patient_id: 1, // 临时使用固定值，实际应该根据病人姓名查询或创建
+        doctor_id: doctor_id,
+        image_path: imageData, // base64编码的图片数据
+        confirmed: false
+      }
+      
+      // 调用API提交诊断
+      const result = await submitDiagnosisApi(diagnosisData)
+      ElMessage.success('诊断结果已保存')
+      
+      // 重置表单和图片
+      patientForm.value.patientName = ''
+      segmentedImgUrl.value = ''
+      currentImage.value = null
+      
+      // 跳转到未审核报告页面
+      router.push('/dashboard/doctor/reports/pending')
+    } catch (error) {
+      console.error('保存诊断结果失败:', error)
+      ElMessage.error('保存诊断结果失败：' + (error.response?.data?.error || error.message))
+    } finally {
+      submitting.value = false
+    }
+  })
+}
 </script>
 
 <style scoped>
@@ -304,5 +400,12 @@ const getDiagnosisType = (diagnosis) => {
 
 :deep(.el-descriptions) {
   margin-top: 20px;
+}
+
+.patient-info-section {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
 }
 </style> 

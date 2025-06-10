@@ -18,12 +18,16 @@
         <div class="section">
           <h3>基本信息</h3>
           <el-descriptions :column="3" border>
-            <el-descriptions-item label="报告编号">{{ reportInfo.reportId }}</el-descriptions-item>
-            <el-descriptions-item label="患者姓名">{{ reportInfo.patientName }}</el-descriptions-item>
-            <el-descriptions-item label="患者ID">{{ reportInfo.patientId }}</el-descriptions-item>
-            <el-descriptions-item label="检查日期">{{ reportInfo.checkDate }}</el-descriptions-item>
-            <el-descriptions-item label="诊断时间">{{ reportInfo.diagnosisTime }}</el-descriptions-item>
-            <el-descriptions-item label="诊断医生">{{ reportInfo.doctor }}</el-descriptions-item>
+            <el-descriptions-item label="报告编号">{{ reportInfo.report_id }}</el-descriptions-item>
+            <el-descriptions-item label="患者姓名">{{ reportInfo.patient_name }}</el-descriptions-item>
+            <el-descriptions-item label="患者ID">{{ reportInfo.patient_id }}</el-descriptions-item>
+            <el-descriptions-item label="检查日期">{{ reportInfo.check_date }}</el-descriptions-item>
+            <el-descriptions-item label="诊断时间">{{ reportInfo.check_time }}</el-descriptions-item>
+            <el-descriptions-item label="审核状态">
+              <el-tag :type="getStatusType(reportInfo.status)">
+                {{ reportInfo.status }}
+              </el-tag>
+            </el-descriptions-item>
           </el-descriptions>
         </div>
 
@@ -31,14 +35,7 @@
         <div class="section">
           <h3>眼底图像</h3>
           <div class="image-container">
-            <img :src="reportInfo.imageUrl" class="fundus-image" />
-            <div class="image-markers">
-              <div v-for="(marker, index) in reportInfo.lesions" :key="index" class="marker">
-                <el-tag :type="marker.severity === 'high' ? 'danger' : 'warning'">
-                  {{ marker.description }}
-                </el-tag>
-              </div>
-            </div>
+            <img :src="getImageUrl(reportInfo.image_path)" class="fundus-image" />
           </div>
         </div>
 
@@ -54,18 +51,13 @@
         </div>
 
         <!-- 审核信息 -->
-        <div class="section" v-if="reportInfo.status !== '待审核'">
+        <div class="section" v-if="reportInfo.status === '已审核'">
           <h3>审核信息</h3>
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="审核状态">
-              <el-tag :type="getStatusType(reportInfo.status)">
-                {{ reportInfo.status }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="审核医生">{{ reportInfo.reviewer }}</el-descriptions-item>
-            <el-descriptions-item label="审核时间">{{ reportInfo.reviewTime }}</el-descriptions-item>
-            <el-descriptions-item label="审核意见" :span="2">
-              {{ reportInfo.reviewComment }}
+            <el-descriptions-item label="审核医生ID">{{ reportInfo.doctor_id }}</el-descriptions-item>
+            <el-descriptions-item label="审核医生">{{ reportInfo.doctor_name }}</el-descriptions-item>
+            <el-descriptions-item label="健康建议" :span="2">
+              {{ reportInfo.health_advice || '暂无健康建议' }}
             </el-descriptions-item>
           </el-descriptions>
         </div>
@@ -78,28 +70,30 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getDiagnosisDetail } from '@/api/diagnosis'
 
 const router = useRouter()
 const route = useRoute()
 
-// 模拟数据
+// 报告信息
 const reportInfo = ref({
-  reportId: 'R20250528001',
-  patientName: '王五',
-  patientId: '1',
-  checkDate: '2025-05-28',
-  diagnosisTime: '2025-05-28 10:55:01',
-  doctor: '张六',
-  imageUrl: 'https://example.com/fundus-image.jpg',
+  report_id: '',
+  patient_name: '',
+  patient_id: '',
+  doctor_name: '',
+  doctor_id: '',
+  check_date: '',
+  check_time: '',
+  status: '',
+  image_path: '',
   diagnosisResult: {
     title: '检测到异常',
     type: 'warning',
     description: '发现4种病灶，建议加急检查'
   },
-  status: '已审核',
-  reviewer: '张六',
-  reviewTime: '2025-05-28 10:55:01',
-  reviewComment: '诊断结果准确，建议合理。'
+  reviewerId: '',
+  reviewerName: '',
+  healthAdvice: ''
 })
 
 const getStatusType = (status) => {
@@ -119,10 +113,40 @@ const handlePrint = () => {
   ElMessage.success('正在生成打印文件...')
 }
 
+// 获取报告详情
+const fetchReportDetail = async (diagnosisId) => {
+  try {
+    const data = await getDiagnosisDetail(diagnosisId)
+    reportInfo.value = {
+      ...data,
+      diagnosisResult: {
+        title: '检测到异常',
+        type: 'warning',
+        description: '发现4种病灶，建议加急检查'
+      }
+    }
+  } catch (error) {
+    ElMessage.error('获取报告详情失败')
+    console.error('获取报告详情失败:', error)
+  }
+}
+
+// 获取图片URL
+const getImageUrl = (path) => {
+  if (!path) return ''
+  // 如果path已经包含完整路径，直接返回
+  if (path.startsWith('http')) return path
+  // 将反斜杠转换为正斜杠，并确保路径格式正确
+  const normalizedPath = path.replace(/\\/g, '/')
+  return `http://localhost:5000/${normalizedPath}`
+}
+
 onMounted(() => {
   // 根据路由参数获取报告详情
-  const reportId = route.params.id
-  console.log('Loading report:', reportId)
+  const diagnosisId = route.params.id
+  if (diagnosisId) {
+    fetchReportDetail(diagnosisId)
+  }
 })
 </script>
 

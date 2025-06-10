@@ -10,9 +10,9 @@
       </el-col>
       <el-col :span="6">
         <el-card class="overview-card">
-          <div class="overview-title">待审核报告</div>
-          <div class="overview-value">{{ stats.pendingReports }}</div>
-          <el-tag type="warning" size="small">待审核</el-tag>
+          <div class="overview-title">本月诊断</div>
+          <div class="overview-value">{{ stats.monthDiagnosis }}</div>
+          <el-tag type="info" size="small">月度</el-tag>
         </el-card>
       </el-col>
       <el-col :span="6">
@@ -24,9 +24,9 @@
       </el-col>
       <el-col :span="6">
         <el-card class="overview-card">
-          <div class="overview-title">本月诊断</div>
-          <div class="overview-value">{{ stats.monthDiagnosis }}</div>
-          <el-tag type="info" size="small">月度</el-tag>
+          <div class="overview-title">待审核报告</div>
+          <div class="overview-value">{{ stats.pendingReports }}</div>
+          <el-tag type="warning" size="small">待审核</el-tag>
         </el-card>
       </el-col>
     </el-row>
@@ -36,16 +36,17 @@
         <el-card class="main-card">
           <template #header>
             <span>待处理病例</span>
-            <el-link class="view-all" type="primary" @click="goToPending">查看全部</el-link>
           </template>
           <el-table :data="pendingCases" style="width: 100%">
-            <el-table-column prop="patientName" label="患者姓名" width="120" />
-            <el-table-column prop="caseId" label="病例ID" width="120" />
-            <el-table-column prop="diagnosisTime" label="诊断时间" width="180" />
-            <el-table-column prop="lesionCount" label="病灶数量" width="100" />
-            <el-table-column prop="status" label="状态" width="100">
+            <el-table-column prop="patient_name" label="患者姓名" width="120" />
+            <el-table-column prop="diagnosis_id" label="病例ID" width="120" />
+            <el-table-column prop="diagnose_date" label="诊断时间" width="180" />
+            <el-table-column prop="lesion_count" label="病灶数量" width="100" />
+            <el-table-column prop="confirmed" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
+                <el-tag :type="row.confirmed ? 'success' : 'warning'">
+                  {{ row.confirmed ? '已审核' : '待审核' }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="120">
@@ -61,16 +62,15 @@
         <el-card class="main-card">
           <template #header>
             <span>最近诊断记录</span>
-            <el-link class="view-all" type="primary" @click="goToHistory">查看全部</el-link>
           </template>
           <el-timeline>
             <el-timeline-item
               v-for="(item, idx) in recentRecords"
               :key="idx"
-              :timestamp="item.time"
-              :type="item.type"
+              :timestamp="item.diagnosis_time_only"
+              type="primary"
             >
-              {{ item.content }}
+              {{ item.patient_name }}
             </el-timeline-item>
           </el-timeline>
         </el-card>
@@ -80,28 +80,44 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getDoctorStats, getDoctorPendingCases, getDoctorRecentDiagnoses } from '@/api/diagnosis'
+import dayjs from 'dayjs'
 
 const router = useRouter()
 
 // 顶部统计数据
 const stats = ref({
-  todayDiagnosis: 0,
-  pendingReports: 0,
-  abnormalCases: 0,
+  todayDiagnosis: 1,
+  pendingReports: 2,
+  abnormalCases: 3,
   monthDiagnosis: 0
 })
 
+// 获取 doctor_id（假设登录后已存到 localStorage）
+const doctor_id = 1
+
+// 获取统计数据
+const fetchStats = async () => {
+  if (!doctor_id) return
+  try {
+    const res = await getDoctorStats(doctor_id)
+    stats.value.todayDiagnosis = res.today_confirmed
+    stats.value.pendingReports = res.pending
+    stats.value.abnormalCases = res.abnormal_cases
+    stats.value.monthDiagnosis = res.confirmed_this_month
+  } catch (e) {
+    // 可加错误提示
+    console.error('获取统计数据失败', e)
+  }
+}
+
 // 待处理病例（只与AI诊断和报告审核相关）
-const pendingCases = ref([
-  
-])
+const pendingCases = ref([])
 
 // 最近诊断记录
-const recentRecords = ref([
-  
-])
+const recentRecords = ref([])
 
 // 状态标签类型
 const getStatusType = (status) => {
@@ -130,6 +146,30 @@ const goToPending = () => {
 const goToHistory = () => {
   router.push('/dashboard/doctor/diagnosis/history')
 }
+
+const fetchPendingCases = async () => {
+  if (!doctor_id) return
+  try {
+    pendingCases.value = await getDoctorPendingCases(doctor_id)
+  } catch (e) {
+    console.error('获取待处理病例失败', e)
+  }
+}
+
+const fetchRecentRecords = async () => {
+  if (!doctor_id) return
+  try {
+    recentRecords.value = await getDoctorRecentDiagnoses(doctor_id)
+  } catch (e) {
+    console.error('获取最近诊断记录失败', e)
+  }
+}
+
+onMounted(() => {
+  fetchStats()
+  fetchPendingCases()
+  fetchRecentRecords()
+})
 </script>
 
 <style scoped>

@@ -88,8 +88,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getDoctorDiagnosisHistory } from '@/api/diagnosis'
 
 const router = useRouter()
 
@@ -102,18 +103,12 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(100)
 
-// 模拟诊断历史数据
-const diagnosisList = ref([
-  {
-    id: 'IMG001',
-    imageUrl: 'https://example.com/image1.jpg',
-    diagnosisTime: '2025-05-28 10:55:01',
-    lesionCount: 4,
-    aiDiagnosis: '严重病变',
-    doctorReview: '已确认',
-    reviewTime: '025-05-28 10:55:01'
-  }
-])
+const doctor_id = 1
+const diagnosisList = ref([])
+
+onMounted(async () => {
+  diagnosisList.value = await getDoctorDiagnosisHistory(doctor_id)
+})
 
 // 根据搜索条件过滤数据
 const filteredDiagnosisList = computed(() => {

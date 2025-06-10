@@ -98,10 +98,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getDoctorDiagnosisHistory } from '@/api/diagnosis'
 
 const router = useRouter()
 const loading = ref(false)
@@ -113,36 +114,12 @@ const total = ref(100)
 const deleteDialogVisible = ref(false)
 const selectedRecord = ref(null)
 
-// 模拟数据
-const diagnosisList = ref([
-  {
-    patientName: '张三',
-    patientId: 'P001',
-    checkDate: '2024-03-20',
-    diagnosisTime: '2024-03-20 14:30:00',
-    lesionCount: 2,
-    status: '已完成',
-    doctor: '李医生'
-  },
-  {
-    patientName: '李四',
-    patientId: 'P002',
-    checkDate: '2024-03-20',
-    diagnosisTime: '2024-03-20 13:45:00',
-    lesionCount: 0,
-    status: '待审核',
-    doctor: '王医生'
-  },
-  {
-    patientName: '王五',
-    patientId: 'P003',
-    checkDate: '2024-03-19',
-    diagnosisTime: '2024-03-19 11:20:00',
-    lesionCount: 3,
-    status: '待处理',
-    doctor: '张医生'
-  }
-])
+const doctor_id = localStorage.getItem('doctor_id')
+const diagnosisList = ref([])
+
+onMounted(async () => {
+  diagnosisList.value = await getDoctorDiagnosisHistory(doctor_id, 'false')
+})
 
 const filteredDiagnosisList = computed(() => {
   return diagnosisList.value.filter(item => {
