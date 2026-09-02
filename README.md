@@ -2,6 +2,7 @@
 ## AI-Assisted Diabetic Retinopathy Diagnosis System
 
 An end-to-end web-based diabetic retinopathy diagnosis system integrating deep learning segmentation models with a Flask backend and Vue3 frontend.
+(All programming files are in https://github.com/WBNvs/Diagnosis-of-diabetes-retinopathy/tree/main/%E7%8E%8B%E8%B4%9D%E5%AE%81)
 
 > Developed as a software engineering and AI course research project at Tongji University.
 
@@ -101,14 +102,22 @@ Our work focuses on model improvement, system integration, deployment, and AI-as
 
 ## Screenshots
 
-### Login
+### Doctor's Dashboard
 
-*(Insert screenshot here)*
+![doctor_dashboard](images/doctor_dashboard.png)
 
-### Diagnosis Page
+### Doctor's Patient List Page
 
-*(Insert screenshot here)*
+![doctor_patient_lists](images/doctor_patient_lists.png)
 
-### Segmentation Result
+### Doctor's Diagnosis Page
 
-*(Insert screenshot here)*
+![doctor_report](images/doctor_report.png)
+
+### Patient's Dashboard
+
+![patient_dashboard](images/patient_dashboard.png)
+
+### Patient's Segmentation Result
+
+![patient_report](images/patient_report.png)
